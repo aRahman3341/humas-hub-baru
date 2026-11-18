@@ -1,0 +1,7 @@
+<?php
+// Jalankan sekali setelah schema.sql diimpor dan config.php dikonfigurasi.
+$config=require __DIR__.'/config.php';
+$key=base64_decode($config['encryption_key']??'',true);if($key===false||strlen($key)!==32)exit('Encryption key belum benar. Generate: php -r "echo base64_encode(random_bytes(32)), PHP_EOL;"');
+try{$pdo=new PDO('mysql:host='.$config['db_host'].';dbname='.$config['db_name'].';charset=utf8mb4',$config['db_user'],$config['db_pass'],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);$count=(int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();if($count>0)exit('Akun sudah ada; installer berhenti demi keamanan. Hapus install.php sekarang.');
+$seeds=[['superadmin','Super Admin','superadmin','Super123!'],['admin','Admin','admin','Admin123!'],['editor','Editor','editor','Editor123!']];$q=$pdo->prepare('INSERT INTO users(username,name,role,password_ciphertext,password_nonce,password_tag,caption_access) VALUES(?,?,?,?,?,?,?)');foreach($seeds as [$username,$name,$role,$plain]){$nonce=random_bytes(12);$tag='';$cipher=openssl_encrypt($plain,'aes-256-gcm',$key,OPENSSL_RAW_DATA,$nonce,$tag);$q->execute([$username,$name,$role,base64_encode($cipher),bin2hex($nonce),bin2hex($tag),$role==='editor'?0:1]);}echo 'Akun awal berhasil dibuat. Login: superadmin / Super123!, admin / Admin123!, editor / Editor123!. Segera ganti semua password, hapus install.php, dan lindungi config.php.';
+}catch(Throwable $e){http_response_code(500);echo 'Installer gagal: '.htmlspecialchars($e->getMessage(),ENT_QUOTES,'UTF-8');}
